@@ -1,103 +1,169 @@
-import Image from "next/image";
+'use client';
 
-export default function Home() {
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Skeleton } from '@/components/ui/skeleton';
+
+interface Youtuber {
+  id: string;
+  name: string;
+  subscribers: number | null;
+  displayedSubscribers: number | null;
+  loading: boolean;
+  thumbnailUrl?: string;
+}
+
+interface YouTubeApiResponse {
+  items?: {
+    statistics: {
+      subscriberCount: string;
+      videoCount: string;
+      viewCount: string;
+    };
+    snippet?: {
+      thumbnails: {
+        default: { url: string };
+        medium: { url: string };
+        high: { url: string };
+      };
+    };
+  }[];
+}
+
+export default function YouTubeMonitor() {
+  const [youtubers, setYoutubers] = useState<Youtuber[]>([
+    { id: 'UC3LBFXbWtEBdOOUb8-qJm9Q', name: '眾量級CROWD', subscribers: null, displayedSubscribers: null, loading: true },
+    { id: 'UCjMBtSoVSmqE2jTqwKh3ttg', name: 'Andy老師', subscribers: null, displayedSubscribers: null, loading: true },
+    { id: 'UCMHrocT83hHvhQdai31QZ4g', name: '秘月期POPOO', subscribers: null, displayedSubscribers: null, loading: true },
+  ]);
+  
+  // Replace with your actual API key
+  const API_KEY = process.env.NEXT_PUBLIC_YOUTUBE_API_KEY;
+  
+  useEffect(() => {
+    const fetchSubscribers = async () => {
+      try {
+        const updatedYoutubers = [...youtubers];
+        
+        for (let i = 0; i < youtubers.length; i++) {
+          const youtuber = youtubers[i];
+          const response = await fetch(
+            `https://www.googleapis.com/youtube/v3/channels?part=statistics,snippet&id=${youtuber.id}&key=${API_KEY}`
+          );
+          
+          const data: YouTubeApiResponse = await response.json();
+          if (data.items && data.items.length > 0) {
+            const newCount = parseInt(data.items[0].statistics.subscriberCount);
+            updatedYoutubers[i] = {
+              ...youtuber,
+              subscribers: newCount,
+              displayedSubscribers: youtuber.subscribers ?? newCount,
+              thumbnailUrl: data.items[0].snippet?.thumbnails.medium.url,
+              loading: false
+            };
+          }
+        }
+        
+        setYoutubers(updatedYoutubers);
+      } catch (error) {
+        console.error('Error fetching YouTube data:', error);
+      }
+    };
+    
+    fetchSubscribers();
+    
+    // Set up polling every 5 minutes
+    const intervalId = setInterval(fetchSubscribers, 5 * 60 * 1000);
+    
+    // Add animation interval
+    const animationInterval = setInterval(() => {
+      setYoutubers(currentYoutubers => {
+        return currentYoutubers.map(youtuber => {
+          if (!youtuber.subscribers || !youtuber.displayedSubscribers) return youtuber;
+
+          const diff = youtuber.subscribers - youtuber.displayedSubscribers;
+          if (Math.abs(diff) < 1) return youtuber;
+
+          // Increment by roughly 1/300th of the difference (takes ~5 minutes to catch up)
+          const increment = diff / 300;
+          const newDisplayed = youtuber.displayedSubscribers + increment;
+
+          return {
+            ...youtuber,
+            displayedSubscribers: newDisplayed
+          };
+        });
+      });
+    }, 1000); // Update every second
+
+    return () => {
+      clearInterval(intervalId);
+      clearInterval(animationInterval);
+    };
+  }, []);
+  
   return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
-
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
-            />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
+    <div className="container max-w-md mx-auto px-4 py-8">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6 text-center text-amber-800">
+        YouTube Subscription Monitor
+      </h1>
+      
+      <div className="space-y-4">
+        {youtubers.map((youtuber) => (
+          <Card key={youtuber.id} className="overflow-hidden border-2 border-amber-100 shadow-lg">
+            <CardHeader className="bg-amber-100 text-amber-800 py-3 px-4">
+              <h2 className="text-xl font-semibold">{youtuber.name}</h2>
+            </CardHeader>
+            <CardContent className="p-4 bg-amber-50">
+              <div className="flex items-center space-x-4">
+                {youtuber.thumbnailUrl ? (
+                  <img 
+                    src={youtuber.thumbnailUrl} 
+                    alt={`${youtuber.name} channel`}
+                    className="w-20 h-20 rounded-full border-2 border-amber-200"
+                  />
+                ) : (
+                  <Skeleton className="w-20 h-20 rounded-full" />
+                )}
+                
+                <div className="flex-1">
+                  <p className="text-sm text-amber-700 font-medium">Subscribers</p>
+                  {youtuber.loading ? (
+                    <Skeleton className="h-8 w-24" />
+                  ) : (
+                    <p className="text-3xl font-bold text-amber-900">
+                      {youtuber.displayedSubscribers ? Math.round(youtuber.displayedSubscribers).toLocaleString() : 0}
+                    </p>
+                  )}
+                </div>
+              </div>
+              
+              <div className="mt-4 flex justify-end">
+                <a 
+                  href={`https://www.youtube.com/channel/${youtuber.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex items-center px-4 py-2 bg-amber-200 text-amber-800 rounded-md hover:bg-amber-300 transition-colors"
+                >
+                  <span>Visit Channel</span>
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 ml-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14 5l7 7m0 0l-7 7m7-7H3" />
+                  </svg>
+                </a>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+      
+      <div className="mt-8 p-4 bg-amber-50 rounded-lg shadow-sm border border-amber-100">
+        <p className="text-center text-sm text-amber-700">
+          Data refreshes automatically every 5 minutes
+        </p>
+        <p className="text-center text-xs text-amber-600 mt-1">
+          Last updated: {new Date().toLocaleTimeString()}
+        </p>
+      </div>
     </div>
   );
 }
